@@ -2,6 +2,7 @@
 
 This fork focuses on improving the handwritten document synthetization aspect of the original repo.
 I tried to keep the synthesizer as stand-alone as possible, so some files and code were relocated or removed.
+
 These are the main modifications which were made (based on the version cloned on Apr 28, 2018):
 - Added new distortions: elastic deformation and ink degradation.
 - Modified existing distortions: spline interpolation, document noise, background blending.
@@ -12,7 +13,7 @@ These are the main modifications which were made (based on the version cloned on
 - The synth can now generate pages, lines and words at the same time.
 - Misc bug fixes and code refactoring.
 
-<sub><sup>Note: this list is not a comprehensive changelog.</sup></sub>
+<sup>Note: this list is not a comprehensive changelog.</sup>
 
 ### Known issues
 There are two main known issues which need to be solved:
