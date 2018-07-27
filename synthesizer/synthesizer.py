@@ -809,10 +809,19 @@ class Synthesizer(object):
         nlines = self.text_layout.get_line_count()
         segment_data = []
         for i in range(nlines):
-            start = self.text_layout.get_line(i).start_index
-            end = start + self.text_layout.get_line(i).length
-            segment_data.append({"start": start, "end": end})
+            start, end = self.text_layout.get_line_range(i)
+            caption = self.current_page_caption[start:end]
+            right_whitespace = len(caption) - len(caption.rstrip())
+            end -= right_whitespace
+            if end-start > 0:
+                segment_data.append({"start": start, "end": end})
         return segment_data
+
+    def print_text_segments(self, segment_data):
+        """ Debug function to print the text associated with the generated segments
+        """
+        for s in segment_data:
+            print self.current_page_caption[s["start"]:s["end"]]
 
     def stitch_ranges(self, caption, range_array, char_ltrb):
         """Takes a string, its respective bounding boxes, and ranges of all the substrings and provides bounding boxes
@@ -909,7 +918,8 @@ class CorporaSynthesizer(Synthesizer):
             self.image_width = page_width
         else:
             self.image_width = letter_height*30
-        self.corpora = OcrCorpus.create_iliad_corpus(lang='eng')
+        self.corpora = OcrCorpus.create_file_corpus("./data/corpora/test_unicode.txt")
+        #self.corpora = OcrCorpus.create_iliad_corpus(lang='eng')
         self.chars_per_page = chars_per_page
 
     def render_page_text(self):

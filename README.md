@@ -11,13 +11,13 @@ These are the main modifications which were made (based on the version cloned on
 - Words and lines are now split using the text string and not the character bounding boxes (much more reliable).
 - The synth can now generate a synthetic clone of a dataset if the necessary data is provided.
 - The synth can now generate pages, lines and words at the same time.
+- Everything should work with UTF-8 now (needs more testing)
 - Misc bug fixes and code refactoring.
 
 <sup>Note: this list is not a comprehensive changelog.</sup>
 
 ### Known issues
-There are two main known issues which need to be solved:
-- When using UTF-8 text, words and lines get correctly segmented at string level, but not at image level.
+The following are the main known issues which need to be solved:
 - The function `raw_interp2` found in `utils/image_processing.py` wrongly rotates the image by 180º.
 
 ## Install dependencies

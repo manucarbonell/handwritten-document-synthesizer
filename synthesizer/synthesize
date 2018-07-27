@@ -6,7 +6,7 @@ from synthesizer import clone_dataset, generate_pages
 from util import get_system_fonts, get_arg_switches
 
 def main():
-    switches = {"font-size": 64, "words": False, "lines": False, "num-pages": 1,
+    switches = {"font-size": 64, "words": True, "lines": True, "num-pages": 2,
                 "const-width": 0, "distort-bboxes": False, "clone-dataset": "",
                 "out-dir": "./out", "load-last-seed": False, "list-fonts": False}
     switches, help_str = get_arg_switches(switches, argv=None)
