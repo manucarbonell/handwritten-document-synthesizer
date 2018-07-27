@@ -912,14 +912,22 @@ class CorporaSynthesizer(Synthesizer):
     """ Class which synthesizes a set amount of pages consuming text from the provided corpora.
     """
     def __init__(self, letter_height, words, lines, out_path, bg_paths, font_list, constant_width, distort_bboxes,
-                       page_width=0, chars_per_page=1000):
+                       page_width, chars_per_page, corpus):
         super(CorporaSynthesizer, self).__init__(letter_height, words, lines, out_path, bg_paths, font_list, constant_width, distort_bboxes)
+
         if page_width:
+            if page_width < self.crop_edge_ltrb[0] + self.crop_edge_ltrb[2] + self.letter_height*5:
+                print "Error: Page width too small."
+                sys.exit()
             self.image_width = page_width
         else:
             self.image_width = letter_height*30
-        self.corpora = OcrCorpus.create_file_corpus("./data/corpora/test_unicode.txt")
-        #self.corpora = OcrCorpus.create_iliad_corpus(lang='eng')
+        
+        if corpus:
+            self.corpus = OcrCorpus.create_file_corpus(corpus)
+        else:
+            self.corpus = OcrCorpus.create_iliad_corpus(lang='eng')
+        
         self.chars_per_page = chars_per_page
 
     def render_page_text(self):
@@ -938,7 +946,7 @@ class CorporaSynthesizer(Synthesizer):
     def generate_random_page(self):
         # reders page
         font = np.random.choice(self.font_list)
-        text = self.corpora.read_str(self.chars_per_page)
+        text = self.corpus.read_str(self.chars_per_page)
         self.generate_page(font, text)
 
         # saves page
@@ -1121,10 +1129,10 @@ def clone_dataset(letter_height, words, lines, out_path, load_last_seed, constan
     synth.finalize()
     print "Finished!"
 
-def generate_pages(letter_height, words, lines, out_path, load_last_seed, constant_width, distort_bboxes, num_pages):
+def generate_pages(letter_height, words, lines, out_path, load_last_seed, constant_width, distort_bboxes, num_pages, page_width, chars_per_page, corpus):
     font_list, bg_paths = common_init(load_last_seed, out_path)
 
-    synth = CorporaSynthesizer(letter_height, words, lines, out_path, bg_paths, font_list, constant_width, distort_bboxes)
+    synth = CorporaSynthesizer(letter_height, words, lines, out_path, bg_paths, font_list, constant_width, distort_bboxes, page_width, chars_per_page, corpus)
 
     while synth.page_count < num_pages:
         print "Rendering page {}/{}...".format(synth.page_count+1, num_pages)

@@ -19,6 +19,7 @@ These are the main modifications which were made (based on the version cloned on
 ### Known issues
 The following are the main known issues which need to be solved:
 - The function `raw_interp2` found in `utils/image_processing.py` wrongly rotates the image by 180º.
+- When cloning a dataset, page width is not adjusted to text precisely because it can cause an error.
 
 ## Install dependencies
 To run this code, you must have Python 2.7 installed.
