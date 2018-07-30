@@ -760,7 +760,6 @@ class Synthesizer(object):
         :param pause:
         :return:
         """
-        self.current_roi_ltrb = self.current_roi_ltrb[[150, 151], :]
         plt.plot(self.current_roi_ltrb[:, [0, 0, 2, 2, 0]].T,
                  self.current_roi_ltrb[:, [1, 3, 3, 1, 1]].T)
         plt.imshow(self.current_img, cmap='gray', vmin=0.0, vmax=1.0)
