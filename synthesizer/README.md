@@ -30,7 +30,7 @@ Parameters only relevant when not cloning a dataset:
 * `-num-pages=N` specifies how many pages of text should be generated.
 * `-page-width=N` specifies the page width in pixels. If not present, the page width is set to 30 times the font size.
 * `-chars-per-page=N` specifies how many characters will be pulled from the corpus for each page.
-* `-corpus=PATH` if present, the specified text file will be used as the corpus. Otherwise, the default online corpus will be used.
+* `-corpus=PATH` if present, the specified path will be used as the corpus. Otherwise, the default online corpus will be used.
 
 Misc:
 * `-list-fonts` lists all available fonts able to be used with the synthesizer.

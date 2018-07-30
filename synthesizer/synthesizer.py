@@ -168,7 +168,7 @@ class ImageBackground(PixelOperation):
         bg_width = bg.shape[1]
         bg_height = bg.shape[0]
         res = np.empty([fg_height, fg_width, 3])
-        
+
         for left in range(0, fg_width, bg_width):
             right = min(left + bg_width, fg_width)
             width = right - left
@@ -176,7 +176,7 @@ class ImageBackground(PixelOperation):
                 bottom = min(top + bg_height, fg_height)
                 height = bottom - top
                 res[top:bottom,left:right,:] = bg[:height,:width,:]
-        
+
         return res
 
     def resize_bg_scale(self,bg,fg_shape):
@@ -512,7 +512,7 @@ class InkDegradation(PixelOperation):
                 mask[np.random.randint(0, h), np.random.randint(0, w)] = 1
             return mask
 
-        stain_mask = generate_mask(self.stain_density) 
+        stain_mask = generate_mask(self.stain_density)
         erasing_mask = generate_mask(self.erasing_density)
 
         return [stain_mask, erasing_mask]
@@ -567,20 +567,20 @@ class Corpora(object):
         self.curr_file = 0
         self._load_next_file()
 
-    def get_text(self, nchars):
+    def read_str(self, nchars):
         text = self.text.read(nchars)
         if not text:
             if self._load_next_file():
-                text = self.get_text(nchars)
+                text = self.read_str(nchars)
             else:
-                print "out of corpora"
-                text = ""
+                self.curr_file = 0
+                text = self.read_str(nchars)
         return text
 
     def _load_next_file(self):
         if self.curr_file == self.num_files:
             return False
-        print self.files[self.curr_file]
+        print "Using text from", self.files[self.curr_file]
         with open_txt(os.path.join(self.corpora_dir, self.files[self.curr_file]), mode="r") as f:
             self.text = StringIO.StringIO(f.read())
             self.curr_file += 1
@@ -722,13 +722,15 @@ class Synthesizer(object):
         # applies the distortion to each word
         for i, (x1, y1, x2, y2) in enumerate(bboxes):
             word = self.current_img[y1:y2, x1:x2]
-            if word.size > 0:
-                pil_im = Image.fromarray(word)
-                w, h = pil_im.size
-                dist = ElasticDistortion((w, h), max(w // 12, 2), max(h // 14, 2), wiggliness)
-                im_dist, _ = dist.apply_on_image(pil_im, None)
-                im = np.array(im_dist)
-                self.current_img[y1:y2, x1:x2] = im
+            pil_im = Image.fromarray(word)
+            w, h = pil_im.size
+            # can't perform elastic transformation on words with width < 2
+            if w < 2:
+                continue
+            dist = ElasticDistortion((w, h), max(w // 12, 2), max(h // 14, 2), wiggliness)
+            im_dist, _ = dist.apply_on_image(pil_im, None)
+            im = np.array(im_dist)
+            self.current_img[y1:y2, x1:x2] = im
         # corrects ranges of the image (caused by the elastic distortion)
         self.current_img[self.current_img > 1] = 1
         self.current_img[self.current_img < 0] = 0
@@ -742,7 +744,7 @@ class Synthesizer(object):
         # Elastic distortion is word level, so it's not obvious how it should be integrated
         # with the rest of the distortions. For the time being, it's done separately here.
         self.distort_words()
-        
+
         # applies all the distortions defined in the pipeline
         img, bboxes = self.current_img, self.current_grapheme_ltrb
         for i, operation in enumerate(self.distort_operations):
@@ -758,6 +760,7 @@ class Synthesizer(object):
         :param pause:
         :return:
         """
+        self.current_roi_ltrb = self.current_roi_ltrb[[150, 151], :]
         plt.plot(self.current_roi_ltrb[:, [0, 0, 2, 2, 0]].T,
                  self.current_roi_ltrb[:, [1, 3, 3, 1, 1]].T)
         plt.imshow(self.current_img, cmap='gray', vmin=0.0, vmax=1.0)
@@ -849,12 +852,24 @@ class Synthesizer(object):
         """ Distorts the bounding boxes by randomly expanding or contracting them.
             Doesn't make sure that the bboxes don't go out of bounds.
         """
-        x_disp = int(x_factor * self.letter_height)
-        y_disp = int(y_factor * self.letter_height)
-        random_disp = np.random.uniform(-1, 1, (len(bboxes), 4))
-        random_disp[:, [0, 2]] *= x_disp
-        random_disp[:, [1, 3]] *= y_disp
-        return bboxes + random_disp
+        bad_bboxes = True
+        # sets the max number of iterations to perform before giving up
+        max_iters = 16
+        iters = 0
+        while iters < max_iters and bad_bboxes:
+            x_disp = int(x_factor * self.letter_height)
+            y_disp = int(y_factor * self.letter_height)
+            random_disp = np.random.uniform(-1, 1, (len(bboxes), 4))
+            random_disp[:, [0, 2]] *= x_disp
+            random_disp[:, [1, 3]] *= y_disp
+            distorted_bboxes = bboxes + random_disp
+            widths = distorted_bboxes[:, 2] - distorted_bboxes[:, 0]
+            heights = distorted_bboxes[:, 3] - distorted_bboxes[:, 1]
+            # makes sure that the bboxes still have some width and height after being distorted
+            bad_bboxes = np.any(widths < 2) or np.any(heights < 2)
+            iters += 1
+
+        return bboxes if bad_bboxes else distorted_bboxes
 
     def dilate_bboxes(self, bboxes, x_factor=0.1, y_factor=0.04):
         """ Dilates the bounding boxes by the specified factors.
@@ -885,11 +900,11 @@ class Synthesizer(object):
         box_r[box_r >= img.shape[1]] = img.shape[1]
         box_b = bboxes[:, 3]
         box_b[box_b >= img.shape[0]] = img.shape[0]
-        
+
         img_list = []
         caption_list = []
         byte_img = (img * 255).astype("uint8")
-        
+
         for n, ltrb in enumerate(bboxes):
             word = byte_img[box_t[n]:box_b[n], box_l[n]:box_r[n]]
             if constant_width:
@@ -922,12 +937,14 @@ class CorporaSynthesizer(Synthesizer):
             self.image_width = page_width
         else:
             self.image_width = letter_height*30
-        
+
         if corpus:
-            self.corpus = OcrCorpus.create_file_corpus(corpus)
+            self.corpus = Corpora(corpus)
+            #self.corpus = OcrCorpus.create_file_corpus(corpus)
         else:
+            print "Using default online corpus."
             self.corpus = OcrCorpus.create_iliad_corpus(lang='eng')
-        
+
         self.chars_per_page = chars_per_page
 
     def render_page_text(self):
@@ -944,14 +961,11 @@ class CorporaSynthesizer(Synthesizer):
                            )
 
     def generate_random_page(self):
-        # reders page
+        # generates page parameters
         font = np.random.choice(self.font_list)
         text = self.corpus.read_str(self.chars_per_page)
-        self.generate_page(font, text)
-
-        # saves page
         form_id = "form_{}".format(self.page_count)
-        save_image_float(1 - self.current_img, os.path.join(self.forms_path, "{}.png".format(form_id)))
+
         # save groundtruth
         with open_txt(os.path.join(self.form_gt_path, "{}.gt.txt".format(form_id)), "w") as f:
             f.write(text)
@@ -959,13 +973,17 @@ class CorporaSynthesizer(Synthesizer):
         with open_txt(os.path.join(self.params_path, "{}.params.txt".format(form_id)), "w") as f:
             f.write("Font:\t{}".format(font))
 
+        # renders page
+        self.generate_page(font, text)
+
+        # saves page
+        save_image_float(1 - self.current_img, os.path.join(self.forms_path, "{}.png".format(form_id)))
+
         # optionally saves segments
         if self.words:
             self.save_segments(self.generate_segments(self.generate_word_segment_data(), suffix="w"), self.words_path, self.gt_words_file)
         if self.lines:
             self.save_segments(self.generate_segments(self.generate_line_segment_data(), suffix="l"), self.lines_path, self.gt_lines_file)
-
-
 
         self.page_count += 1
 
@@ -1044,7 +1062,7 @@ class DatasetSynthesizer(Synthesizer):
             with open_txt(os.path.join(self.params_path, "{}.params.txt".format(author.id)), "w") as f:
                 f.write("Font:\t{}".format(author.font))
 
-    def generate_author_forms(self, author):   
+    def generate_author_forms(self, author):
         """ Generates all forms of a given author
         """
         # makes output directories
@@ -1078,7 +1096,7 @@ def common_init(load_last_seed, out_path):
     # gets file dir
     src_dir, _ = os.path.split(__file__)
 
-    # creates output dir if it doesn't exist    
+    # creates output dir if it doesn't exist
     mkdir_p(out_path)
 
     # mechanism which allows to save the random numpy seed or load the last one
@@ -1125,7 +1143,7 @@ def clone_dataset(letter_height, words, lines, out_path, load_last_seed, constan
     # generates all images of all authors
     for author in synth.author_list:
         synth.generate_author_forms(author)
-    
+
     synth.finalize()
     print "Finished!"
 
