@@ -704,8 +704,8 @@ class Synthesizer(object):
                                     ImageBackground(self.bg_paths, resize_mode='scale', blend_mode='alpha', alpha=0.7),
                                     DocumentNoise([self.page_height, self.page_width]),
                                     GeometricPaperWrapper(page_size=[self.page_height, self.page_width],
-                                                          max_y_disp=self.letter_height / 8.0, num_points=6),
-                                    GeometricClipper((0, 0, self.page_width, self.page_height))
+                                                          max_y_disp=self.letter_height / 8.0, num_points=6)
+                                    #GeometricClipper((0, 0, self.page_width, self.page_height))
                                   ]
 
         self.distort_page()

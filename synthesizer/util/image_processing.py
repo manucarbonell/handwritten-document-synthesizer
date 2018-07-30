@@ -68,7 +68,7 @@ def box_filter1d(img, box_sz, horizontal=True, iter=1):
 
 
 def fake_gaussian(img, vertical_horizontal_sigma, iter=3):
-    """Gaussian filter aproximation with integrall images.
+    """Gaussian filter approximation with integral images.
 
     :param img:
     :param vertical_horizontal_sigma:
@@ -76,24 +76,22 @@ def fake_gaussian(img, vertical_horizontal_sigma, iter=3):
     :return: an image of the same size as img.
     """
     sigma_vertical, sigma_horizontal = vertical_horizontal_sigma
-    h_blured = box_filter1d(img, sigma_horizontal, horizontal=True, iter=iter)
-    blured = box_filter1d(h_blured, sigma_vertical, horizontal=False, iter=iter)
-    return blured
+    h_blurred = box_filter1d(img, sigma_horizontal, horizontal=True, iter=iter)
+    blurred = box_filter1d(h_blurred, sigma_vertical, horizontal=False, iter=iter)
+    return blurred
 
 
 def raw_interp2(X, Y, img):
     """
     Samples from an image each point of the provided geometric space.
-    To be solved:
-    - Artifact Y instability seen on the spline interpolation.
-    - Image getting rotated 180 degrees.
+    Useful for raw geometric transformations.
     """
     e = .001
     X = X.copy()
     X[X < 0] = 0
     X[X >= img.shape[1] - 2] = img.shape[1] - 2
-    Y = Y.shape[0]-Y
-    Y[Y < 0] = 0;
+    Y = Y.copy()
+    Y[Y < 0] = 0
     Y[Y >= img.shape[0] - 2] = img.shape[0] - 2
 
     left = np.floor(X)  # .astype('int32')
@@ -111,19 +109,22 @@ def raw_interp2(X, Y, img):
     right = right.astype("int32")
     bottom = bottom.astype("int32")
 
+    def interp(img):
+        return img[top, left] * left_coef * top_coef + \
+               img[top, right] * right_coef * top_coef + \
+               img[bottom, left] * left_coef * bottom_coef + \
+               img[bottom, right] * right_coef * bottom_coef
+
     res = np.empty(img.shape)
-    if len(img.shape)==2:
-        res[:] = img[top, left] * left_coef * top_coef + img[
-            top, right] * right_coef * top_coef + \
-                img[bottom, left] * left_coef * bottom_coef + img[
-                    bottom, right] * right_coef * bottom_coef
-    elif len(img.shape)==3:
-        #res=res.reshape(-1,3)
-        for c in range(3):
-            cimg=img[:,:,c]
-            res[:,:,c] = cimg[top, left] * left_coef * top_coef + cimg[top, right] * right_coef * top_coef + cimg[bottom, left] * left_coef * bottom_coef + cimg[bottom, right] * right_coef * bottom_coef
-        res=res.reshape(img.shape)
+    if len(img.shape) == 2:
+        res = interp(img)
+    elif len(img.shape) == 3:
+        for c in range(img.shape[2]):
+            cimg = img[:,:,c]
+            res[:,:,c] = interp(cimg)
+        res = res.reshape(img.shape)
 
     res[res < 0] = 0
     res[res > 1] = 1
+
     return res

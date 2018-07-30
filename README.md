@@ -18,14 +18,13 @@ These are the main modifications which were made (based on the version cloned on
 
 ### Known issues
 The following are the main known issues which need to be solved:
-- The function `raw_interp2` found in `utils/image_processing.py` wrongly rotates the image by 180º.
 - When cloning a dataset, page width is not adjusted to text precisely because it can cause an error.
 
 ## Install dependencies
 To run this code, you must have Python 2.7 installed.
 The following Python packages are also required:
 ```bash
-pip install --user --upgrade Pillow matplotlib numpy opencv_contrib_python pycairo scikit_image scipy
+pip install --upgrade Pillow matplotlib numpy opencv-contrib-python pycairo scikit-image scipy
 ```
 
 ## Usage
