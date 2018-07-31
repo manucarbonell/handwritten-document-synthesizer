@@ -209,7 +209,7 @@ class GeometricOperation(object):
     def __call__(self, x_coordinate_list, y_coordinate_list):
         res_x_coordinate_list = []
         res_y_coordinate_list = []
-        params=self.generate_parameters()
+        params = self.generate_parameters()
         for k in range(len(x_coordinate_list)):
             X = x_coordinate_list[k].copy()
             Y = y_coordinate_list[k].copy()
@@ -229,19 +229,19 @@ class GeometricOperation(object):
         b = ltrb[:, 3]
         X, Y = np.meshgrid(np.arange(img.shape[1]), np.arange(img.shape[0]))
         in_x_coords = [X, l, r]#[X, l, l, r, r]
-        in_y_coords = [Y, t, b]#[Y, t, b, t, b]
-        out_x_coords, out_y_coords = self(in_x_coords,in_y_coords)
+        in_y_coords = [Y, img.shape[0] - t, img.shape[0] - b]#[Y, t, b, t, b]
+        out_x_coords, out_y_coords = self(in_x_coords, in_y_coords)
         #[X, x1, x2, x3, x4] = out_x_coords
         [X, x1, x2] = out_x_coords
         #[Y, y1, y2, y3, y4] = out_y_coords
         [Y, y1, y2] = out_y_coords
         res_img = raw_interp2(X, Y, img)
-        res_ltrp = np.empty(ltrb.shape)
-        res_ltrp[:, 0] = x1#np.min([x1,x2],axis=0)#,x3,x4], axis=0)
-        res_ltrp[:, 2] = x2##np.max([x1, x2],axis=0)#, x3, x4], axis=0)
-        res_ltrp[:, 1] = y1#np.min([y1, y2],axis=0)#, y3, y4], axis=0)
-        res_ltrp[:, 3] = y2#np.max([y1, y2],axis=0)#, y3, y4], axis=0)
-        return res_img, res_ltrp
+        res_ltrb = np.empty(ltrb.shape)
+        res_ltrb[:, 0] = x1#np.min([x1,x2],axis=0)#,x3,x4], axis=0)
+        res_ltrb[:, 2] = x2#np.max([x1, x2],axis=0)#, x3, x4], axis=0)
+        res_ltrb[:, 1] = img.shape[0] - y1#np.min([y1, y2],axis=0)#, y3, y4], axis=0)
+        res_ltrb[:, 3] = img.shape[0] - y2#np.max([y1, y2],axis=0)#, y3, y4], axis=0)
+        return res_img, res_ltrb
 
 
 class GeometricSequence(GeometricOperation):
@@ -312,7 +312,7 @@ class GeometricPaperWrapper(GeometricOperation):
         if len(Y.shape)==2:
             Y = Y + all_y[None,:]
         elif len(Y.shape)==1:
-            Y[:]=Y[:] + all_y[X[:]]
+            Y[:]=Y[:] + all_y[X[:].astype('int32')]
         else:
             raise ValueError
         return X, Y
@@ -722,6 +722,9 @@ class Synthesizer(object):
         # applies the distortion to each word
         for i, (x1, y1, x2, y2) in enumerate(bboxes):
             word = self.current_img[y1:y2, x1:x2]
+            # aborts distortion if bbox doesn't enclose a valid region
+            if word.size == 0:
+                continue
             pil_im = Image.fromarray(word)
             w, h = pil_im.size
             # can't perform elastic transformation on words with width < 2
@@ -981,6 +984,7 @@ class CorporaSynthesizer(Synthesizer):
         # optionally saves segments
         if self.words:
             self.save_segments(self.generate_segments(self.generate_word_segment_data(), suffix="w"), self.words_path, self.gt_words_file)
+            self.plot_current_page()
         if self.lines:
             self.save_segments(self.generate_segments(self.generate_line_segment_data(), suffix="l"), self.lines_path, self.gt_lines_file)
 

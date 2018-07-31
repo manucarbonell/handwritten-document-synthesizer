@@ -18,6 +18,7 @@ These are the main modifications which were made (based on the version cloned on
 
 ### Known issues
 The following are the main known issues which need to be solved:
+- In some rare cases, two characters on different lines could be considered the same word, creating a very large bounding box.
 - When cloning a dataset, page width is not adjusted to text precisely because it can cause an error.
 
 ## Install dependencies
