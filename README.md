@@ -18,14 +18,21 @@ These are the main modifications which were made (based on the version cloned on
 
 ### Known issues
 The following are the main known issues which need to be solved:
-- In some rare cases, two characters on different lines could be considered the same word, creating a very large bounding box.
 - When cloning a dataset, page width is not adjusted to text precisely because it can cause an error.
 
 ## Install dependencies
 To run this code, you must have Python 2.7 installed.
-The following Python packages are also required:
+You also need some libraries for text rendering:
 ```bash
-pip install --upgrade Pillow matplotlib numpy opencv-contrib-python pycairo scikit-image scipy
+sudo apt install libcairo2-dev libpango1.0-dev
+```
+After that, you need to install the python bindings for them:
+```bash
+sudo apt install python-gtk2
+```
+Finally, the following python packages are required:
+```bash
+sudo pip install Pillow matplotlib numpy opencv-contrib-python scikit-image scipy
 ```
 
 ## Usage

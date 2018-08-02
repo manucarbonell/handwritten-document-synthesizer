@@ -9,14 +9,19 @@ import sys
 import StringIO
 from math import floor, ceil
 
+# supresses innocuous, verbose warnings caused by scipy
+import warnings
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+
 # image processing
 import cv2
-import scipy.interpolate as interpolate
-import scipy.ndimage as ndi
 import skimage
 import skimage.filters
 from matplotlib import pyplot as plt
 from PIL import Image
+import scipy.interpolate as interpolate
+import scipy.ndimage as ndi
 
 # other packages
 import pango
@@ -790,22 +795,33 @@ class Synthesizer(object):
     def generate_word_segment_data(self):
         """ Gets the index ranges of each word in the current page text
         """
-        bin_array = self.get_letter_idx(self.current_page_caption)
-        lengths = runLengthEncoding(bin_array, bin_array[0])
         segment_data = []
-        curr_char_index = 0
         curr_word_index = 0
-        for n in lengths:
-            caption = self.current_page_caption[curr_char_index:curr_char_index+n]
-            left_whitespace = len(caption) - len(caption.lstrip())
-            #print left_whitespace
-            stripped_caption_length = len(caption.strip())
-            start = curr_char_index + left_whitespace
-            end = start + stripped_caption_length
-            if end-start > 0:
-                segment_data.append({"start": start, "end": end})
-                curr_word_index += 1
-            curr_char_index += n
+        # iterates over all lines individually
+        for line_index in range(self.text_layout.get_line_count()):
+            line_start, line_end = self.text_layout.get_line_range(line_index)
+            line = self.current_page_caption[line_start:line_end]
+            # if the line's blank, skip it
+            if not line:
+                continue
+            # splits the text by non-letter characters
+            bin_array = self.get_letter_idx(line)
+            lengths = runLengthEncoding(bin_array, bin_array[0])
+            curr_char_index = 0  
+            for n in lengths:
+                caption = line[curr_char_index:curr_char_index+n]
+                # makes sure there's no leftover whitespace sorrounding the word
+                left_whitespace = len(caption) - len(caption.lstrip())
+                stripped_caption_length = len(caption.strip())
+                start = curr_char_index + left_whitespace
+                end = start + stripped_caption_length
+                # if the word's blank, skip it
+                if end-start > 0:
+                    segment_data.append({"start": line_start + start,
+                                         "end": line_start + end})
+                    curr_word_index += 1
+                curr_char_index += n
+
         return segment_data
 
     def generate_line_segment_data(self):
@@ -984,7 +1000,6 @@ class CorporaSynthesizer(Synthesizer):
         # optionally saves segments
         if self.words:
             self.save_segments(self.generate_segments(self.generate_word_segment_data(), suffix="w"), self.words_path, self.gt_words_file)
-            self.plot_current_page()
         if self.lines:
             self.save_segments(self.generate_segments(self.generate_line_segment_data(), suffix="l"), self.lines_path, self.gt_lines_file)
 

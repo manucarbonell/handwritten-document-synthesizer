@@ -6,7 +6,7 @@ import string
 
 class TextLayoutWrapper:
     """ Wrapper class to abstract the underlying pangocairo layout.
-    Currently used only to get the starting and ending indices of the text lines.
+    Currently used to perform operations related to the text lines.
     """
     def __init__(self, layout, char_bytes):
         self.layout = layout
@@ -22,13 +22,19 @@ class TextLayoutWrapper:
             raise IndexError("Byte {} isn't the first byte of any character in the text.".format(byte))
         return res[0]
 
+    def char_to_byte(self, char_index):
+        return self.cum_bytes[char_index]
+
     def get_line_range(self, index):
+        """ Returns the indices of the first and last characters of a line
+        """
         start_byte = self.layout.get_line(index).start_index
         start_char = self.byte_to_char(start_byte)
         byte_length = self.layout.get_line(index).length
         end_byte = start_byte + byte_length
         end_char = self.byte_to_char(end_byte)
         return start_char, end_char
+
 
 def get_system_fonts():
     """ Retrieves all fonts found in the system
