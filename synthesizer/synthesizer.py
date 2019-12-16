@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#5 -*- coding: utf-8 -*-
 
 # python built-in
 import codecs
@@ -6,8 +6,11 @@ import string
 import pickle
 import os
 import sys
-import StringIO
+from io import StringIO
 from math import floor, ceil
+import pdb
+import string 
+import re
 
 # supresses innocuous, verbose warnings caused by scipy
 import warnings
@@ -97,9 +100,9 @@ class DocumentNoise(PixelOperation):
         high_pass = img * skimage.filters.gaussian(high_pass[:,:,:], high_pass_sigma, multichannel=True)
         # return 1-high_pass
         #res = (low_pass[:,:,None] + high_pass)  # np.maximum(low_pass,img)
-        #print res[:,:,0].min(),res[:,:,0].max()
-        #print res[:,:,1].min(),res[:,:,1].max()
-        #print res[:,:,2].min(),res[:,:,2].max()
+        ##print res[:,:,0].min(),res[:,:,0].max()
+        ##print res[:,:,1].min(),res[:,:,1].max()
+        ##print res[:,:,2].min(),res[:,:,2].max()
         #res = res - res.min() / (res.max() - res.min())
         return high_pass
 
@@ -571,6 +574,10 @@ class Corpora(object):
         self.num_files = len(self.files)
         self.curr_file = 0
         self._load_next_file()
+        self.curr_word_idx = 0
+        self.n_words_read = 0
+        tags_file = open('data/tags.txt','r')
+        self.tags_list=tags_file.readlines()[0].split(' ')
 
     def read_str(self, nchars):
         text = self.text.read(nchars)
@@ -580,15 +587,27 @@ class Corpora(object):
             else:
                 self.curr_file = 0
                 text = self.read_str(nchars)
+                
+        while text[-1]!=' ':
+            text = text+self.text.read(1)
+        #self.curr_word_idx+=self.n_words_read
         return text
+    
+    def read_tags(self):
+        tags_list = self.tags_list[self.curr_word_idx:self.n_words_read+self.curr_word_idx]
+        
+        return tags_list
 
     def _load_next_file(self):
         if self.curr_file == self.num_files:
             return False
-        print "Using text from", self.files[self.curr_file]
+        #print ("Using text from", self.files[self.curr_file])
+
         with open_txt(os.path.join(self.corpora_dir, self.files[self.curr_file]), mode="r") as f:
             self.text = StringIO.StringIO(f.read())
             self.curr_file += 1
+
+
             return True
 
 """ Classes related to the synthesis process """
@@ -610,6 +629,7 @@ class Synthesizer(object):
 
         # predetermined values
         self.crop_edge_ltrb = np.array([letter_height*2]*4)
+        self.crop_edge_ltrb[-1]*=10
         self.font_alignment = pango.ALIGN_LEFT
         self.page_count = 0
 
@@ -699,7 +719,6 @@ class Synthesizer(object):
         self.current_page_caption = text
         self.current_img, self.current_page_caption, self.current_grapheme_ltrb, self.page_height, self.page_width, self.text_layout = self.render_page_text()
         self.current_page_caption = u''.join(self.current_page_caption)
-
         # distortions need to be defined here because they now depend on page size,
         # and page size can't be known before rendering the text, since it gets adjusted
         self.distort_operations = [
@@ -789,15 +808,15 @@ class Synthesizer(object):
     def get_letter_idx(self, caption):
         """Given a string, returns a boolean numpy array with True for letter and digit characters and False for symbols.
         """
-        symbols = set(string.printable) - set(string.letters) - set(string.digits)
+        symbols = [',','.',' ']   #set(string.#printable) - set(string.letters) - set(string.digits)
         return np.array([c not in symbols for c in caption], dtype='bool')
 
     def generate_word_segment_data(self):
         """ Gets the index ranges of each word in the current page text
         """
         segment_data = []
-        curr_word_index = 0
         # iterates over all lines individually
+        self.corpus.n_words_read=0
         for line_index in range(self.text_layout.get_line_count()):
             line_start, line_end = self.text_layout.get_line_range(line_index)
             line = self.current_page_caption[line_start:line_end]
@@ -807,21 +826,30 @@ class Synthesizer(object):
             # splits the text by non-letter characters
             bin_array = self.get_letter_idx(line)
             lengths = runLengthEncoding(bin_array, bin_array[0])
+            
+            '''lengths=[]
+            for w in re.split('[^A-Za-z0-9]',line):
+                if len(w)>0:
+                    lengths.append(len(w))
+
+                    lengths.append(1)'''
+
             curr_char_index = 0  
-            for n in lengths:
+            for i in range(len(lengths)):
+                n = lengths[i]
                 caption = line[curr_char_index:curr_char_index+n]
                 # makes sure there's no leftover whitespace sorrounding the word
                 left_whitespace = len(caption) - len(caption.lstrip())
                 stripped_caption_length = len(caption.strip())
-                start = curr_char_index + left_whitespace
+                start = curr_char_index+left_whitespace 
                 end = start + stripped_caption_length
                 # if the word's blank, skip it
                 if end-start > 0:
                     segment_data.append({"start": line_start + start,
                                          "end": line_start + end})
-                    curr_word_index += 1
+                    if i<len(lengths)-1:
+                        self.corpus.n_words_read+=1
                 curr_char_index += n
-
         return segment_data
 
     def generate_line_segment_data(self):
@@ -839,10 +867,10 @@ class Synthesizer(object):
         return segment_data
 
     def print_text_segments(self, segment_data):
-        """ Debug function to print the text associated with the generated segments
+        """ Debug function to #print the text associated with the generated segments
         """
         for s in segment_data:
-            print self.current_page_caption[s["start"]:s["end"]]
+            print (self.current_page_caption[s["start"]:s["end"]])
 
     def stitch_ranges(self, caption, range_array, char_ltrb):
         """Takes a string, its respective bounding boxes, and ranges of all the substrings and provides bounding boxes
@@ -856,13 +884,14 @@ class Synthesizer(object):
         """
         range_captions = np.empty(range_array.shape[0], dtype='object')
         range_ltrb = np.empty([range_array.shape[0], 4], dtype='int32')
-
         for n, ranges in enumerate(range_array):
             range_captions[n] = caption[ranges[0]:ranges[1]].strip()
             range_ltrb[n, :] = char_ltrb[ranges[0]:ranges[1], 0].min(), \
                                char_ltrb[ranges[0]:ranges[1], 1].min(), \
                                char_ltrb[ranges[0]:ranges[1], 2].max(), \
                                char_ltrb[ranges[0]:ranges[1], 3].max()
+            if '"' in range_captions[n]:
+                print(range_captions[n])
 
         return range_captions, range_ltrb
 
@@ -929,13 +958,13 @@ class Synthesizer(object):
                 chars = len(gt_str_list[n])
                 width_per_char = word.shape[1] / float(chars)
                 ratio = constant_width / float(width_per_char)
-                # print "wpc:", width_per_char
-                # print "ratio 1:", ratio
+                # #print "wpc:", width_per_char
+                # #print "ratio 1:", ratio
                 # takes vertical resizing into account
                 ratio *= word.shape[0]/float(self.letter_height)
-                # print "ratio 2:", ratio
+                # #print "ratio 2:", ratio
                 word = cv2.resize(word, (int(word.shape[1]*ratio), word.shape[0]), interpolation=cv2.INTER_NEAREST)
-                # print "wpc:", word.shape[1] / float(chars)
+                # #print "wpc:", word.shape[1] / float(chars)
             img_list.append(word)
             caption_list.append(gt_str_list[n])
 
@@ -950,7 +979,7 @@ class CorporaSynthesizer(Synthesizer):
 
         if page_width:
             if page_width < self.crop_edge_ltrb[0] + self.crop_edge_ltrb[2] + self.letter_height*5:
-                print "Error: Page width too small."
+                #print "Error: Page width too small."
                 sys.exit()
             self.image_width = page_width
         else:
@@ -960,7 +989,7 @@ class CorporaSynthesizer(Synthesizer):
             self.corpus = Corpora(corpus)
             #self.corpus = OcrCorpus.create_file_corpus(corpus)
         else:
-            print "Using default online corpus."
+            #print "Using default online corpus."
             self.corpus = OcrCorpus.create_iliad_corpus(lang='eng')
 
         self.chars_per_page = chars_per_page
@@ -981,12 +1010,11 @@ class CorporaSynthesizer(Synthesizer):
     def generate_random_page(self):
         # generates page parameters
         font = np.random.choice(self.font_list)
-        text = self.corpus.read_str(self.chars_per_page)
-        form_id = "form_{}".format(self.page_count)
 
-        # save groundtruth
-        with open_txt(os.path.join(self.form_gt_path, "{}.gt.txt".format(form_id)), "w") as f:
-            f.write(text)
+        text = self.corpus.read_str(self.chars_per_page)
+        
+        form_id = "form_{}".format(self.page_count)
+        
         # saves parameters
         with open_txt(os.path.join(self.params_path, "{}.params.txt".format(form_id)), "w") as f:
             f.write("Font:\t{}".format(font))
@@ -995,16 +1023,52 @@ class CorporaSynthesizer(Synthesizer):
         self.generate_page(font, text)
 
         # saves page
-        save_image_float(1 - self.current_img, os.path.join(self.forms_path, "{}.png".format(form_id)))
+        page_im_path = os.path.join(self.forms_path, "{}.png".format(form_id))
 
+        save_image_float(1 - self.current_img, page_im_path)
+        
         # optionally saves segments
         if self.words:
             self.save_segments(self.generate_segments(self.generate_word_segment_data(), suffix="w"), self.words_path, self.gt_words_file)
         if self.lines:
             self.save_segments(self.generate_segments(self.generate_line_segment_data(), suffix="l"), self.lines_path, self.gt_lines_file)
 
-        self.page_count += 1
+        tags = self.corpus.read_tags()
+        text_words = self.current_roi_captions # text.split(' ')
+        # save groundtruth
+        #with open_txt(os.path.join(self.form_gt_path, "{}.gt.txt".format(form_id)), "w") as f:
+        if self.page_count==0: 
+            open_mode='w'
+        else:
+            open_mode='a'
+        img=self.current_img
+        self.corpus.curr_word_idx+=self.corpus.n_words_read
+        n_words_in_page = max(self.current_roi_ltrb.shape[0],len(tags),len(text_words))
+        #print self.current_roi_ltrb.shape[0],len(tags),len(text_words)
+        #print(zip(tags,text_words),self.corpus.curr_word_idx)
+        colors=[(int(np.random.random()*25*i),int(np.random.random()*25*i),int(np.random.random()*25*i)) for i in range(20)]
+        classes=list(np.unique(tags))
+        
+        
 
+        with open_txt("box_ground_truth.txt", open_mode) as f:
+            for w in range(n_words_in_page):
+                x0 = str(int(self.current_roi_ltrb[w,0]))
+                y0 = str(int(self.current_roi_ltrb[w,1]))
+                x1 = str(int(self.current_roi_ltrb[w,2]))
+                y1 = str(int(self.current_roi_ltrb[w,3]))
+                if len(tags[w])<1:
+                    tags[w]=' '
+                f.write(",".join([page_im_path,x0,y0,x1,y1,tags[w],text_words[w]+"\n"]))
+                #f.write(",".join([page_im_path,x0,y0,x1,y1,'text',text_words[w]+"\n"]))
+                #cv2.rectangle(img, pt1=(int(x0), int(y0)), pt2=(int(x1), int(y1)), color=colors[classes.index(tags[w])], thickness=1, lineType=8, shift=0)
+                #cv2.rectangle((255*img).astype('uint8'), (int(x0), int(y0)), (int(x1), int(y1)),1, (0,0,0), 2)
+                #cv2.putText(img, text=text_words[w]+'_'+tags[w],  org=(int(x0), int(y0)-10), fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1,color=1,  thickness=1, lineType=8)
+                #cv2.putText(img, text_words[w], (x0, y0-10), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), 2)
+
+        #page_gt_im_path = os.path.join(self.forms_path, "{}_gt.png".format(form_id))
+        #save_image_float(1 - img, page_gt_im_path)
+        self.page_count += 1
 
 class DatasetSynthesizer(Synthesizer):
     """
@@ -1093,10 +1157,10 @@ class DatasetSynthesizer(Synthesizer):
             lines_path = os.path.join(self.lines_path, author.id)
             mkdir_p(lines_path)
 
-        print "Generating forms of author {}...".format(author.id)
+        #print "Generating forms of author {}...".format(author.id)
 
         for form in author.forms:
-            print "\t{}".format(form.id)
+            #print "\t{}".format(form.id)
             # generates the form
             self.generate_page(author.font, form.text)
             save_image_float(1 - self.current_img, os.path.join(forms_path, form.id + ".png"))
@@ -1119,7 +1183,7 @@ def common_init(load_last_seed, out_path):
 
     # mechanism which allows to save the random numpy seed or load the last one
     if load_last_seed:
-        print "Loading last seed."
+        #print "Loading last seed."
         with open(os.path.join(out_path, "numpy_seed.pkl"), "r") as s:
             np.random.set_state(pickle.load(s))
     else:
@@ -1137,12 +1201,12 @@ def common_init(load_last_seed, out_path):
     available_fonts = get_system_fonts()
     self.font_list = list(set(font_names).intersection(set(available_fonts)))
 
-    print "Fonts which were not found:", len(font_names) - len(self.font_list)
+    #print "Fonts which were not found:", len(font_names) - len(self.font_list)
     for font in font_names:
         if font not in available_fonts:
-            print font
-    print set(font_names)
-    print set(self.font_list)
+            #print font
+    #print set(font_names)
+    #print set(self.font_list)
     """
 
     # backgrounds which will be used for pages
@@ -1163,7 +1227,7 @@ def clone_dataset(letter_height, words, lines, out_path, load_last_seed, constan
         synth.generate_author_forms(author)
 
     synth.finalize()
-    print "Finished!"
+    #print "Finished!"
 
 def generate_pages(letter_height, words, lines, out_path, load_last_seed, constant_width, distort_bboxes, num_pages, page_width, chars_per_page, corpus):
     font_list, bg_paths = common_init(load_last_seed, out_path)
@@ -1171,8 +1235,8 @@ def generate_pages(letter_height, words, lines, out_path, load_last_seed, consta
     synth = CorporaSynthesizer(letter_height, words, lines, out_path, bg_paths, font_list, constant_width, distort_bboxes, page_width, chars_per_page, corpus)
 
     while synth.page_count < num_pages:
-        print "Rendering page {}/{}...".format(synth.page_count+1, num_pages)
+        #print "Rendering page {}/{}...".format(synth.page_count+1, num_pages)
         synth.generate_random_page()
 
     synth.finalize()
-    print "Finished!"
+    #print "Finished!"

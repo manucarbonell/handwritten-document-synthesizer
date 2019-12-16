@@ -1,3 +1,4 @@
+import pdb
 import pango
 import pangocairo
 import cairo
@@ -62,8 +63,8 @@ def get_text_size(text, font_name, font_height, layout_width, alignment=pango.AL
 
     return layout.get_pixel_size()
 
-def render_text(text=np.array(list("Hello\nWorld")), font_name='times', font_height=64, image_width=1000, image_height=1000,
-                crop_edge_ltrb=np.array([10,10,10,10]), alignment=pango.ALIGN_LEFT,
+def render_text(text=np.array(list("Hello\nWorld")), font_name='times', font_height=64, image_width=1000, image_height=3000,
+                crop_edge_ltrb=np.array([10,10,10,100]), alignment=pango.ALIGN_LEFT,
                 adjust_font_height=True, adjust_image_width=False, adjust_image_height=True):
     """ Renders the specified text on a canvas.
     Parameters
@@ -164,6 +165,7 @@ def render_text(text=np.array(list("Hello\nWorld")), font_name='times', font_hei
     """ To get the bounding boxes of the characters, their byte index must be provided.
     Since UTF-8 uses variable encoding, the size of each character must be calculated
     individually to correctly index them """
+
     char_bytes = [len(c.encode('utf-8')) for c in text]
 
     char_ltwh = []
@@ -171,7 +173,7 @@ def render_text(text=np.array(list("Hello\nWorld")), font_name='times', font_hei
     for nbytes in char_bytes:
         char_ltwh.append(layout.index_to_pos(curr_byte))
         curr_byte += nbytes
-
+    
     char_ltwh = np.array(char_ltwh)
     char_ltwh /= pango.SCALE
 
@@ -179,7 +181,6 @@ def render_text(text=np.array(list("Hello\nWorld")), font_name='times', font_hei
     char_ltrb[:, 2:] += char_ltwh[:,:2]
     char_ltrb[:, [0, 2]] += (crop_edge_ltrb[0])
     char_ltrb[:, [1, 3]] += (crop_edge_ltrb[1])
-
 
     # makes sure the text fits in the page
 
